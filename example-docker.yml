@@ -1,0 +1,35 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+  vars:
+    libseccomp: libseccomp-2.2.1-1.el7.x86_64.rpm
+    libtool: libtool-ltdl-2.4.2-20.el7.x86_64.rpm
+    docker_engine_selinux: docker-engine-selinux-1.12.1-1.el7.centos.noarch.rpm
+    docker_engine: docker-engine-1.12.0-1.el7.centos.x86_64.rpm
+
+  tasks:
+    - file: path={{ ansible_user_dir }}/docker state=directory
+
+    - name: Docker rpm files transfered
+      copy: src=files/docker/{{ item }} dest={{ ansible_user_dir }}/docker/{{ item }}
+      with_items:
+        - "{{ libseccomp }}"
+        - "{{ libtool }}"
+        - "{{ docker_engine_selinux }}"
+        - "{{ docker_engine }}"
+
+    - name: install Docker Dependencies
+      yum: name={{ ansible_user_dir }}/docker/{{ item }} state=present
+      with_items:
+        - "{{ libseccomp }}"
+        - "{{ libtool }}"
+
+    - name: intall Docker
+      yum: name={{ ansible_user_dir }}/docker/{{item}} state=present
+      with_items:
+        - "{{ docker_engine_selinux }}"
+        - "{{ docker_engine }}"
+
+#    - name: add sudo authority
+#      command: usermod -aG docker $(whoami)

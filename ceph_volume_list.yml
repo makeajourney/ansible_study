@@ -1,0 +1,9 @@
+---
+- hosts: ceph
+  tasks:
+    - name : ceph-volume
+      become: true
+      shell: ceph osd df --format=json-pretty
+      register: result
+
+    - local_action: shell echo "{{ result.stdout }}" > print_result.txt

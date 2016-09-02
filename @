@@ -1,0 +1,9 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+  vars:
+    motd_warning: 'Selim TSG Tech Lab - Ansible Test Host'
+  tasks:
+    - name: setup a MOTD
+      copy: dest=/etc/motd content={{ motd_warning }}

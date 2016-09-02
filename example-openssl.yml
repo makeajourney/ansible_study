@@ -1,0 +1,106 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+  vars:
+    host: localhost
+    ssl_passphrase: secret
+
+  tasks:
+    - name: Install pexpect
+      easy_install: name=pexpect state=latest
+
+    - name: Generate CA Key
+      expect:
+        command: openssl genrsa -aes256 -out ca-key.pem 4096
+        chdir: "{{ ansible_user_dir }}"
+        responses:
+          phrase: "{{ ssl_passphrase }}"
+
+    - name: Add CA Key and Info to CSR
+      expect:
+        command : openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem
+        chdir: "{{ ansible_user_dir }}"
+        responses:
+          phrase: "{{ ssl_passphrase }}"
+          Country: KR
+          State: .
+          Locality: .
+          Organization: .
+          Organizaional: .
+          Common: localhost
+          Email: .
+
+    - name: Create Server Key
+      command: openssl genrsa -out server-key.pem 4096 chdir={{ ansible_user_dir }}
+
+    - name: Create Server CSR
+      command: openssl req -subj "/CN={{ host }}" -sha256 -new -key server-key.pem -out server.csr chdir={{ ansible_user_dir }}
+
+    - name: Set subjectAltName to cnf file
+      copy: dest={{ ansible_user_dir }}/extfile.cnf content='subjectAltName = IP:127.0.0.1'
+
+    - name: Create the Cerficate to allow connectios
+      expect:
+        command: openssl x509 -req -days 365 -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -extfile extfile.cnf
+        chdir: "{{ ansible_user_dir }}"
+        responses:
+          phrase: "{{ ssl_passphrase }}"
+
+    - name: Create a Client Key
+      command: openssl genrsa -out key.pem 4096 chdir={{ ansible_user_dir }}
+
+    - name: Create Client CSR
+      command: openssl req -subj '/CN=client' -new -key key.pem -out client.csr chdir={{ ansible_user_dir }}
+
+    - name: Set extendedKeyUsage to cnf file
+      copy: dest={{ ansible_user_dir }}/extfile.cnf content='extendedKeyUsage = clientAuth'
+
+    - name: Sign the Public Key
+      expect:
+        command: openssl x509 -req -days 365 -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out cert.pem -extfile extfile.cnf
+        chdir: "{{ ansible_user_dir }}"
+        responses:
+          phrase: "{{ ssl_passphrase }}"
+
+    - name: Remove csr file
+      file: path={{ ansible_user_dir }}/{{ item }}.csr state=absent
+      with_items:
+        - client
+        - server
+
+    - name: Change file mode 0400
+      file: path={{ ansible_user_dir }}/{{ item }}.pem mode=0400
+      with_items:
+        - ca-key
+        - key
+        - server-key
+
+    - name: Change file mode 0444
+      file: path={{ ansible_user_dir}}/{{ item }}.pem mode=0444
+      with_items:
+        - ca
+        - server-cert
+        - cert
+
+    - file: path={{ ansible_user_dir }}/.docker state=directory
+
+    - copy: remote_src=True src={{ ansible_user_dir }}/{{ item }}.pem dest={{ ansible_user_dir }}/.docker/{{ item }}.pem
+      with_items:
+        - ca
+        - cert
+        - key
+
+    - name: set env var DOCKER_HOST
+      shell: echo DOCKER_HOST is $DOCKER_HOST
+      environment:
+        DOCKER_HOST: tcp://{{ host }}:2376
+      register: shellout
+    - debug: var=shellout
+
+    - name: set DOCKER_TLS_VERIFY
+      shell: echo DOCKER_TLS_VERIFY is $DOCKER_TLS_VERIFY
+      environment:
+        DOCKER_TLS_VERIFY: 1
+      register: shellout
+    - debug: var=shellout

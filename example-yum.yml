@@ -1,0 +1,17 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+
+  tasks:
+    - file: path=/etc/yum.repo.d state=directory
+
+    - name: create rhel-yum.repo file
+      copy: src=files/yum/rhel-yum.repo dest=/etc/yum.repo.d/rhel-yum.repo
+
+    - name: add GPG Key
+      rpm_key: state=present key=http://mirror.centos.org/centos/7/os/x86_64/RPM-GPG-KEY-CentOS-7
+
+    - name: yum upgrade all packages
+      yum: name=* state=latest
+
