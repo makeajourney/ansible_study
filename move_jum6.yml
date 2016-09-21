@@ -1,0 +1,8 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+
+  tasks:
+    - name: move py module jum6
+      copy: src=jum6 dest=/tmp/jum6 mode=777
