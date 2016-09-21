@@ -1,0 +1,12 @@
+---
+- hosts: targets
+  become: yes
+  user: centos
+  strategy: free
+
+  tasks:
+    - name: get file containing installed list
+      command: /tmp/jum6 flist installed base {{ ansible_eth0.ipv4.address }}
+
+    - name: fetch files from remote
+      fetch: src=/tmp/{{ ansible_eth0.ipv4.address }}.json dest=/tmp/{{ ansible_eth0.ipv4.address }}.json flat=yes
